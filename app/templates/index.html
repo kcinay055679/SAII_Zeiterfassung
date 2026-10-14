@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zeiterfassung</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
 <main>
@@ -12,20 +13,31 @@
 
   {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 
-  <form method="post" action="/stamp">
-    <label>Name
-      <input name="name" value="{{ name }}" maxlength="{{ max_name }}" required autocomplete="name">
+  <form method="post" action="/person" class="person">
+    <label>Person
+      <input id="name" name="name" list="people" value="{{ name }}" maxlength="{{ max_name }}"
+             required autocomplete="off" placeholder="Name wählen oder neu eingeben">
     </label>
+    <datalist id="people">
+      {% for p in people %}<option value="{{ p }}"></option>{% endfor %}
+    </datalist>
+    <p class="hint">Enter wählt die Person aus. Gibt es den Namen noch nicht, wird die Person neu angelegt.</p>
+  </form>
+
+  <form method="post" action="/stamp">
+    <input type="hidden" name="name" value="{{ name }}">
     <label>Rapport / Notiz (optional)
-      <input name="note" maxlength="{{ max_note }}" placeholder="z.B. Support XYZ Kunde Meyer">
+      <input name="note" maxlength="{{ max_note }}" placeholder="z.B. Support XYZ Kunde Meyer"{% if not me %} disabled{% endif %}>
     </label>
     {% if me %}
     <p class="me">{{ me.person }}: <strong class="status status-{{ me.status|lower|replace(' ', '-') }}">{{ status_labels[me.status] }}</strong>
       &middot; heute {{ me.worked_seconds|duration }} h</p>
+    {% else %}
+    <p class="me empty">Zuerst eine Person wählen.</p>
     {% endif %}
     <div class="actions">
       {% for action in actions %}
-      <button name="action" value="{{ action }}"{% if me and action not in me.allowed %} disabled{% endif %}>{{ labels[action] }}</button>
+      <button name="action" value="{{ action }}"{% if not me or action not in me.allowed %} disabled{% endif %}>{{ labels[action] }}</button>
       {% endfor %}
     </div>
   </form>

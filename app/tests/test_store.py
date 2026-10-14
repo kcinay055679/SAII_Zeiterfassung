@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from store import (ON_BREAK, OUT, WORKING, InvalidInput, InvalidTransition,
-                   Store, start_of_day)
+                   Store, UnknownPerson, start_of_day)
 
 # 10:00 in Zurich (CEST, UTC+2)
 NOON = datetime(2026, 7, 1, 8, 0, tzinfo=timezone.utc)
@@ -14,6 +14,8 @@ NOON = datetime(2026, 7, 1, 8, 0, tzinfo=timezone.utc)
 def store(tmp_path):
     s = Store(tmp_path / "test.db")
     s.init()
+    for name in ("Anna", "Ben", "Anna Meyer"):
+        s.add_person(name)
     return s
 
 
@@ -26,7 +28,7 @@ def test_full_day_cycle(store):
     store.record("Anna", "PAUSE", now=at(60))
     store.record("Anna", "ZURUECK", now=at(90))
     store.record("Anna", "AUS", now=at(150))
-    [anna] = store.board(now=at(200))
+    anna = store.status_of("Anna", now=at(200))
     assert anna.status == OUT
     assert anna.worked_seconds == 120 * 60
 
@@ -60,14 +62,14 @@ def test_people_are_independent(store):
     store.record("Ben", "EIN", now=at(1))
     store.record("Anna", "PAUSE", now=at(2))
     statuses = {p.person: p.status for p in store.board(now=at(3))}
-    assert statuses == {"Anna": ON_BREAK, "Ben": WORKING}
+    assert statuses == {"Anna": ON_BREAK, "Ben": WORKING, "Anna Meyer": OUT}
 
 
 def test_names_match_case_and_whitespace_insensitive(store):
     store.record("Anna Meyer", "EIN", now=at(0))
     stamp = store.record("  anna   MEYER ", "AUS", now=at(10))
     assert stamp.person == "Anna Meyer"
-    assert [p.person for p in store.board(now=at(11))] == ["Anna Meyer"]
+    assert store.find_person("ANNA meyer") == "Anna Meyer"
 
 
 def test_shift_across_midnight_counts_only_today(store):
@@ -98,6 +100,7 @@ def test_concurrent_ein_accepts_exactly_one(tmp_path):
     """Several replicas stamping at once must not let the same person in twice."""
     path = tmp_path / "shared.db"
     Store(path).init()
+    Store(path).add_person("Anna")
     results = []
     barrier = threading.Barrier(8)
 
@@ -117,3 +120,47 @@ def test_concurrent_ein_accepts_exactly_one(tmp_path):
         t.join()
     assert results.count("ok") == 1
     assert results.count("rejected") == 7
+
+
+def test_stamping_an_unknown_person_is_rejected(store):
+    with pytest.raises(UnknownPerson):
+        store.record("Nobody", "EIN")
+    assert store.recent() == []
+
+
+def test_add_person_is_idempotent_and_keeps_first_spelling(store):
+    assert store.add_person("Clara Huber") == ("Clara Huber", True)
+    assert store.add_person("  clara HUBER ") == ("Clara Huber", False)
+    assert store.people().count("Clara Huber") == 1
+
+
+def test_person_without_stamps_is_on_the_board(store):
+    store.add_person("Clara")
+    clara = store.status_of("Clara", now=at(0))
+    assert (clara.status, clara.worked_seconds) == (OUT, 0)
+    assert "Clara" in [p.person for p in store.board(now=at(0))]
+
+
+def test_people_are_sorted_case_insensitive(store):
+    store.add_person("bert")
+    assert store.people() == ["Anna", "Anna Meyer", "Ben", "bert"]
+
+
+def test_existing_stamps_become_persons_on_upgrade(tmp_path):
+    """Databases from 1.3 have stamps but no persons table."""
+    import sqlite3
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE stamps (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL,
+            person_key TEXT NOT NULL, person TEXT NOT NULL, action TEXT NOT NULL,
+            note TEXT NOT NULL DEFAULT '', pod TEXT NOT NULL DEFAULT '');
+        INSERT INTO stamps (ts, person_key, person, action)
+            VALUES ('2026-07-01T08:00:00+00:00', 'anna meyer', 'Anna Meyer', 'EIN');
+    """)
+    conn.commit()
+    conn.close()
+    store = Store(path)
+    store.init()
+    assert store.people() == ["Anna Meyer"]
+    assert store.status_of("Anna Meyer", now=at(30)).status == WORKING

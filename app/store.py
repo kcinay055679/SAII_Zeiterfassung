@@ -34,11 +34,25 @@ CREATE TABLE IF NOT EXISTS stamps (
     pod        TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS stamps_person_ts ON stamps (person_key, ts);
+CREATE TABLE IF NOT EXISTS persons (
+    key     TEXT PRIMARY KEY,
+    name    TEXT NOT NULL,
+    created TEXT NOT NULL
+);
+-- Databases from before persons existed: everyone who has stamped is a person.
+INSERT OR IGNORE INTO persons (key, name, created)
+    SELECT s.person_key, s.person, s.ts FROM stamps s
+    WHERE s.id = (SELECT MIN(id) FROM stamps WHERE person_key = s.person_key);
 """
 
 
 class InvalidInput(ValueError):
     pass
+
+
+class UnknownPerson(LookupError):
+    def __init__(self, name: str):
+        super().__init__(f"{name} doesn't exist yet, create the person first")
 
 
 class InvalidTransition(ValueError):
@@ -171,11 +185,31 @@ class Store:
         ).fetchone()
         return STATUS_AFTER[row["action"]] if row else OUT
 
-    def _display_name(self, conn: sqlite3.Connection, key: str, fallback: str) -> str:
-        row = conn.execute(
-            "SELECT person FROM stamps WHERE person_key = ? ORDER BY id LIMIT 1", (key,)
-        ).fetchone()
-        return row["person"] if row else fallback
+    def add_person(self, name: str, now: datetime | None = None) -> tuple[str, bool]:
+        """Returns the stored spelling and whether the person was newly created."""
+        name = clean_name(name)
+        now = now or datetime.now(timezone.utc)
+        with closing(self.connect()) as conn:
+            created = conn.execute(
+                "INSERT OR IGNORE INTO persons (key, name, created) VALUES (?, ?, ?)",
+                (person_key(name), name, now.isoformat(timespec="seconds")),
+            ).rowcount == 1
+            row = conn.execute(
+                "SELECT name FROM persons WHERE key = ?", (person_key(name),)
+            ).fetchone()
+        return row["name"], created
+
+    def find_person(self, name: str) -> str | None:
+        with closing(self.connect()) as conn:
+            row = conn.execute(
+                "SELECT name FROM persons WHERE key = ?", (person_key(name),)
+            ).fetchone()
+        return row["name"] if row else None
+
+    def people(self) -> list[str]:
+        with closing(self.connect()) as conn:
+            rows = conn.execute("SELECT name FROM persons ORDER BY key").fetchall()
+        return [r["name"] for r in rows]
 
     def record(self, name: str, action: str, note: str = "", pod: str = "",
                now: datetime | None = None) -> Stamp:
@@ -188,11 +222,17 @@ class Store:
         conn = self.connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            person = conn.execute(
+                "SELECT name FROM persons WHERE key = ?", (key,)
+            ).fetchone()
+            if person is None:
+                conn.execute("ROLLBACK")
+                raise UnknownPerson(name)
+            display = person["name"]
             status = self._status(conn, key)
             if action not in ALLOWED[status]:
                 conn.execute("ROLLBACK")
-                raise InvalidTransition(name, status, action)
-            display = self._display_name(conn, key, name)
+                raise InvalidTransition(display, status, action)
             conn.execute(
                 "INSERT INTO stamps (ts, person_key, person, action, note, pod) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
@@ -220,12 +260,10 @@ class Store:
         start = start_of_day(now)
         start_iso = start.isoformat(timespec="seconds")
         with closing(self.connect()) as conn:
-            people = conn.execute(
-                "SELECT person_key, MIN(id) AS first_id FROM stamps GROUP BY person_key"
-            ).fetchall()
+            people = conn.execute("SELECT key, name FROM persons").fetchall()
             result = []
             for row in people:
-                key = row["person_key"]
+                key = row["key"]
                 before = conn.execute(
                     "SELECT * FROM stamps WHERE person_key = ? AND ts < ? "
                     "ORDER BY ts DESC, id DESC LIMIT 1",
@@ -237,11 +275,8 @@ class Store:
                     (key, start_iso, now.isoformat(timespec="seconds")),
                 )]
                 initial = STATUS_AFTER[before["action"]] if before else OUT
-                display = conn.execute(
-                    "SELECT person FROM stamps WHERE id = ?", (row["first_id"],)
-                ).fetchone()["person"]
                 result.append(PersonStatus(
-                    person=display,
+                    person=row["name"],
                     status=status_after(today, initial),
                     worked_seconds=worked_seconds(today, initial, start, now),
                 ))

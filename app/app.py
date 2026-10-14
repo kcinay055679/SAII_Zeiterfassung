@@ -6,7 +6,8 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, render_template, request
 
 from store import (ACTIONS, LABELS, LOCAL_TZ, MAX_NAME, MAX_NOTE, ON_BREAK,
-                   OUT, WORKING, InvalidInput, InvalidTransition, Store)
+                   OUT, WORKING, InvalidInput, InvalidTransition, Store,
+                   UnknownPerson)
 
 NAME_COOKIE = "zeiterfassung_name"
 STATUS_LABELS = {OUT: "AUSGESTEMPELT", WORKING: "EINGESTEMPELT", ON_BREAK: "IN PAUSE"}
@@ -23,7 +24,7 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
     @app.after_request
     def security_headers(response):
         response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; style-src 'self'; form-action 'self'; "
+            "default-src 'none'; style-src 'self'; script-src 'self'; form-action 'self'; "
             "frame-ancestors 'none'; base-uri 'none'"
         )
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -33,13 +34,21 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
     def wants_json() -> bool:
         return request.is_json
 
+    def payload():
+        return (request.get_json(silent=True) or {}) if wants_json() else request.form
+
+    def remember(response, name: str):
+        response.set_cookie(NAME_COOKIE, name, max_age=60 * 60 * 24 * 365,
+                            httponly=True, samesite="Lax")
+        return response
+
     def render_index(error: str | None = None, status: int = 200):
-        name = request.form.get("name") or request.cookies.get(NAME_COOKIE, "")
-        me = store.status_of(name) if name.strip() else None
+        name = store.find_person(request.cookies.get(NAME_COOKIE, "")) or ""
         return render_template(
             "index.html",
             name=name,
-            me=me,
+            me=store.status_of(name) if name else None,
+            people=store.people(),
             actions=ACTIONS,
             labels=LABELS,
             status_labels=STATUS_LABELS,
@@ -56,17 +65,36 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
     def index():
         return render_index()
 
-    @app.post("/stamp")
-    def stamp():
-        payload = (request.get_json(silent=True) or {}) if wants_json() else request.form
-        name = payload.get("name", "")
+    @app.post("/person")
+    def person():
         try:
-            stamp = store.record(name, payload.get("action", ""),
-                                 payload.get("note", ""), pod=pod)
+            name, created = store.add_person(payload().get("name", ""))
         except InvalidInput as err:
             if wants_json():
                 return jsonify(error=str(err)), 400
             return render_index(str(err), 400)
+        if wants_json():
+            return jsonify(name=name, created=created), 201 if created else 200
+        return remember(redirect("/", code=303), name)
+
+    @app.get("/people")
+    def people():
+        return jsonify(store.people())
+
+    @app.post("/stamp")
+    def stamp():
+        data = payload()
+        try:
+            stamp = store.record(data.get("name", ""), data.get("action", ""),
+                                 data.get("note", ""), pod=pod)
+        except InvalidInput as err:
+            if wants_json():
+                return jsonify(error=str(err)), 400
+            return render_index(str(err), 400)
+        except UnknownPerson as err:
+            if wants_json():
+                return jsonify(error=str(err)), 404
+            return render_index(str(err), 404)
         except InvalidTransition as err:
             if wants_json():
                 return jsonify(error=str(err), status=err.status,
@@ -75,10 +103,7 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
 
         if wants_json():
             return jsonify(stamp.as_dict()), 201
-        response = redirect("/", code=303)
-        response.set_cookie(NAME_COOKIE, stamp.person, max_age=60 * 60 * 24 * 365,
-                            httponly=True, samesite="Lax")
-        return response
+        return remember(redirect("/", code=303), stamp.person)
 
     @app.get("/events")
     def events():

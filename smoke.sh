@@ -21,11 +21,18 @@ check_env() {
   curl -fsS "$url/health" | grep -q '"healthy"' || fail "$env /health not healthy"
   echo "health ok"
 
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$url/stamp" \
+    -H 'Content-Type: application/json' -d "{\"name\":\"$person\",\"action\":\"EIN\"}")
+  [[ $code == 404 ]] || fail "$env stamp for unknown person returned $code, expected 404"
+  curl -fsS -X POST "$url/person" -H 'Content-Type: application/json' \
+    -d "{\"name\":\"$person\"}" >/dev/null
+  echo "unknown person rejected with 404, person created"
+
   stamp "$url" "$person" EIN
   curl -fsS "$url/events" | grep -q "$person" || fail "$env stamp not listed"
   echo "stamped EIN as $person"
 
-  local code
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$url/stamp" \
     -H 'Content-Type: application/json' -d "{\"name\":\"$person\",\"action\":\"EIN\"}")
   [[ $code == 409 ]] || fail "$env second EIN returned $code, expected 409"
