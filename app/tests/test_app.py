@@ -83,3 +83,17 @@ def test_security_headers(client):
 def test_board_endpoint(client):
     client.post("/stamp", json={"name": "Anna", "action": "EIN"})
     assert client.get("/board").get_json()[0]["status"] == "WORKING"
+
+
+def test_concurrent_health_checks_do_not_collide(tmp_path):
+    """Kubernetes fires readiness and liveness probes at the same moment."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    app = create_app(tmp_path)
+
+    def probe(_):
+        return app.test_client().get("/health").status_code
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        codes = list(pool.map(probe, range(200)))
+    assert set(codes) == {200}

@@ -1,5 +1,6 @@
 import os
 import socket
+import tempfile
 from pathlib import Path
 
 from flask import Flask, jsonify, redirect, render_template, request
@@ -93,11 +94,13 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
         # A bare 200 would stay green with a read-only or vanished /data, so the
         # probe writes to the volume and touches the database.
         try:
-            probe = data_dir / f".health-{pod}"
-            probe.write_text("ok", encoding="utf-8")
-            probe.unlink()
+            # Unique name per call: readiness and liveness fire at the same moment.
+            with tempfile.NamedTemporaryFile(dir=data_dir, prefix=".health-") as probe:
+                probe.write(b"ok")
+                probe.flush()
             store.ping()
         except Exception as err:
+            app.logger.warning("health check failed: %s", err)
             return jsonify(status="unhealthy", error=str(err), pod=pod), 503
         return jsonify(status="healthy", pod=pod, version=version)
 
