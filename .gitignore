@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+data/
+docs/*.pdf
+docs_reference*/
+docs_reference*.zip
