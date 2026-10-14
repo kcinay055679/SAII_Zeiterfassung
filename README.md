@@ -145,7 +145,7 @@ The course uses minikube everywhere, this is the mapping.
 
 ## rootless docker
 
-On rootless Docker two things break with the k3d defaults, the Makefile detects rootless and handles both:
+On rootless Docker, two things break with the k3d defaults. The Makefile detects rootless and handles both:
 
 - the kubelet can't open `/dev/kmsg` inside the user namespace and k3s never becomes ready. Fix: `--k3s-arg "--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*"` on `k3d cluster create`
 - `k3d image import` starts a tools container that mounts `/var/run/docker.sock`, which doesn't exist on rootless. Fix: `--mode direct`
