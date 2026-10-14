@@ -8,7 +8,7 @@ RUN /venv/bin/pip install --no-cache-dir -r requirements.txt \
  && /venv/bin/pip uninstall -y pip
 
 FROM ${BASE}
-ARG APP_VERSION=1.2
+ARG APP_VERSION=1.3
 ENV APP_VERSION=${APP_VERSION} \
     DATA_DIR=/data \
     PATH=/venv/bin:$PATH \

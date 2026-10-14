@@ -1,7 +1,7 @@
 CLUSTER      ?= saii
 REGISTRY     ?= registry.localhost
 REGISTRY_PORT ?= 5050
-VERSION      ?= 1.2
+VERSION      ?= 1.3
 IMAGE        := zeiterfassung:$(VERSION)
 PROD_IMAGE   := localhost:$(REGISTRY_PORT)/zeiterfassung:$(VERSION)
 DEV_URL      ?= http://localhost:8080

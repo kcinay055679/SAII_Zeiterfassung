@@ -14,6 +14,6 @@ replicas:
 images:
   - name: zeiterfassung
     newName: k3d-registry.localhost:5050/zeiterfassung
-    newTag: "1.2"
+    newTag: "1.3"
 patches:
   - path: resources-patch.yaml
