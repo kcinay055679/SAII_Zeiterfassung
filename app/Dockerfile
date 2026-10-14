@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN /venv/bin/pip install --no-cache-dir -r requirements.txt
 
 FROM ${BASE}
-ARG APP_VERSION=1.0
+ARG APP_VERSION=1.1
 ENV APP_VERSION=${APP_VERSION} \
     DATA_DIR=/data \
     PATH=/venv/bin:$PATH \
