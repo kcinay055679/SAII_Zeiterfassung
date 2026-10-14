@@ -7,7 +7,7 @@ A small time-tracking service where people clock in, take breaks and clock out t
 ### Tracking
 
 **Person**:
-Someone who stamps, identified only by the name they type in. Names match case-insensitively with surrounding whitespace ignored; the spelling of the first stamp is the one shown.
+Someone who stamps, identified only by their name. A Person exists once created (typing a new name and pressing Enter) and can be picked from the list afterwards. Names match case-insensitively with surrounding whitespace ignored; the spelling used at creation is the one shown.
 _Avoid_: User, employee, account
 
 **Stamp**:

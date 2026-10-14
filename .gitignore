@@ -3,6 +3,5 @@ __pycache__/
 .venv/
 .pytest_cache/
 data/
-docs/*.pdf
 docs_reference*/
 docs_reference*.zip

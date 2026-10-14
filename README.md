@@ -1,8 +1,8 @@
 # Zeiterfassung
 
-A small time-tracking service for the SAII HS2026 Kubernetes assignment. People type their name, stamp `EIN`, `PAUSE`, `ZURÜCK` or `AUS`, optionally with a note, and see a status board with everyone's current status and the time worked today. It runs on a local k3d cluster as a dev and a prod environment, built from one Kustomize base.
+A small time-tracking service for the SAII HS2026 Kubernetes assignment. People pick their name from the list (or type a new one and press Enter to create it), stamp `EIN`, `PAUSE`, `ZURÜCK` or `AUS`, optionally with a note, and see a status board with everyone's current status and the time worked today. It runs on a local k3d cluster as a dev and a prod environment, built from one Kustomize base.
 
-![Zeiterfassung UI](docs/img/ui-prod.png)
+![Zeiterfassung UI](docs/img/ui.png)
 
 ## requirements
 
@@ -12,8 +12,8 @@ A small time-tracking service for the SAII HS2026 Kubernetes assignment. People 
 | k3d | 5.8.3 | replaces minikube from the course |
 | kubectl | 1.35 | |
 | make, curl | any | |
-| Python | 3.13 | only for the unit tests |
-| Typst | 0.15 | only to build `docs/abgabe.pdf` |
+
+That's all. The unit tests run in a `test` stage of the Dockerfile and the PDF is built with the Typst container image, so there is no Python or Typst needed on the host.
 
 The host ports `8080`, `8081` and `5050` have to be free.
 
@@ -58,8 +58,9 @@ kubectl get storageclass   # local-path (default)
 Dev uses a local image that is imported straight into the cluster, no registry involved.
 
 ```bash
-docker build -t zeiterfassung:1.3 --build-arg APP_VERSION=1.3 app
-k3d image import zeiterfassung:1.3 -c saii --mode direct
+docker build --target test app            # unit tests, the build fails if one fails
+docker build -t zeiterfassung:1.4 --build-arg APP_VERSION=1.4 app
+k3d image import zeiterfassung:1.4 -c saii --mode direct
 kubectl kustomize k8s/overlays/dev        # look at it before applying
 kubectl apply -k k8s/overlays/dev
 kubectl -n zeiterfassung-dev rollout status deployment/zeiterfassung
@@ -71,8 +72,8 @@ kubectl -n zeiterfassung-dev get pods,svc,pvc
 Prod pulls from the k3d registry, like a real cluster would pull from a registry.
 
 ```bash
-docker tag zeiterfassung:1.3 localhost:5050/zeiterfassung:1.3
-docker push localhost:5050/zeiterfassung:1.3
+docker tag zeiterfassung:1.4 localhost:5050/zeiterfassung:1.4
+docker push localhost:5050/zeiterfassung:1.4
 kubectl apply -k k8s/overlays/prod
 kubectl -n zeiterfassung-prod rollout status deployment/zeiterfassung
 kubectl -n zeiterfassung-prod get pods,svc,pvc,ingress -o wide
@@ -84,6 +85,7 @@ The host pushes to `localhost:5050`, inside the cluster the same registry is `k3
 
 ```bash
 curl -s localhost:8080/health
+curl -s -X POST localhost:8080/person -H 'Content-Type: application/json' -d '{"name":"Anna Meyer"}'
 curl -s -X POST localhost:8080/stamp -H 'Content-Type: application/json' \
   -d '{"name":"Anna Meyer","action":"EIN","note":"Support XYZ Kunde Meyer"}'
 curl -s localhost:8080/board
@@ -105,7 +107,7 @@ curl -s localhost:8080/events   # the stamp is still there
 | namespace | `zeiterfassung-dev` | `zeiterfassung-prod` |
 | replicas | 1 | 3 |
 | service | `NodePort` 30080 | `ClusterIP` + Traefik `Ingress` |
-| image | `zeiterfassung:1.3`, imported | `k3d-registry.localhost:5050/zeiterfassung:1.3`, pulled |
+| image | `zeiterfassung:1.4`, imported | `k3d-registry.localhost:5050/zeiterfassung:1.4`, pulled |
 | resources | 50m / 64Mi requested, 250m / 128Mi limit | 100m / 128Mi requested, 500m / 256Mi limit |
 | url | `localhost:8080` | `zeiterfassung.localhost:8081` |
 
@@ -114,7 +116,9 @@ curl -s localhost:8080/events   # the stamp is still there
 | Method | Path | What it does |
 | --- | --- | --- |
 | `GET` | `/` | UI |
-| `POST` | `/stamp` | form post => `303` to `/`, JSON post => `201` with the stamp. `400` on invalid input, `409` on a transition that isn't allowed |
+| `POST` | `/person` | creates the person if the name is new and selects it. Form => `303` to `/`, JSON => `201` (created) or `200` (already there) |
+| `GET` | `/people` | all persons |
+| `POST` | `/stamp` | form post => `303` to `/`, JSON post => `201` with the stamp. `400` on invalid input, `404` for an unknown person, `409` on a transition that isn't allowed |
 | `GET` | `/board` | status and worked seconds today per person |
 | `GET` | `/events` | last 20 stamps |
 | `GET` | `/health` | writes a probe file to `/data` and queries the database, `503` if either fails |
@@ -124,7 +128,7 @@ Allowed transitions per person: out -> `EIN` -> working -> `PAUSE` -> on break -
 ## tests and checks
 
 ```bash
-make test    # unit tests (state machine, validation, escaping, concurrency, health)
+make test    # unit tests in a container (state machine, persons, validation, escaping, concurrency, health)
 make smoke   # against the running cluster, both environments
 make scan    # trivy image scan, HIGH and CRITICAL only
 ```
@@ -136,7 +140,7 @@ The course uses minikube everywhere, this is the mapping.
 | minikube | here |
 | --- | --- |
 | `minikube start` | `k3d cluster create saii ...` |
-| `minikube image load zeiterfassung:1.3` | `k3d image import zeiterfassung:1.3 -c saii --mode direct` |
+| `minikube image load zeiterfassung:1.4` | `k3d image import zeiterfassung:1.4 -c saii --mode direct` |
 | `minikube kubectl -- get pods` | `kubectl get pods` |
 | `minikube service zeiterfassung` | fixed port mapping, `localhost:8080` |
 | `minikube addons enable ingress` | Traefik ships with k3s |
@@ -162,7 +166,7 @@ CONTEXT.md           domain glossary
 docs/adr/            architecture decisions
 docs/decisions.md    every decision from planning
 docs/ai-decision-log.md
-docs/abgabe.typ      submission document, `make docs` builds the PDF
+docs/abgabe.typ      submission document, `make docs` builds docs/abgabe.pdf in a container
 ```
 
 ## cleanup

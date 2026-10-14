@@ -19,7 +19,7 @@ Everything settled while planning, in one place. The ones that are hard to rever
 | 6 | Every Stamp carries a Person name, no auth | [ADR-0004](adr/0004-name-per-stamp-without-auth.md) |
 | 7 | Valid transitions enforced per Person; invalid gets HTTP 409, invalid buttons disabled | |
 | 8 | Optional Note per Stamp, max 200 characters | Course: "Rapport/Notiz" |
-| 9 | Main page: name + note + four buttons, Status board, recent Stamps | Name remembered in a cookie; "today" is Europe/Zurich |
+| 9 | Main page: person picker + note + four buttons, Status board, recent Stamps | Selected person remembered in a cookie; "today" is Europe/Zurich |
 | 10 | Form POST answers 303 → `/`, JSON POST answers JSON | Same pattern as the instructor's reference app |
 | 11 | Storage is SQLite under `/data` | [ADR-0002](adr/0002-sqlite-on-shared-rwo-volume.md) |
 
@@ -62,4 +62,14 @@ Details and evidence in the [AI decision log](ai-decision-log.md).
 | 27 | pip removed from the runtime image | Only source of HIGH CVEs |
 | 28 | Rootless Docker: kubelet feature gate and `k3d image import --mode direct` | Detected by the Makefile |
 | 29 | No root initContainer, `fsGroup` is enough on `local-path` | Verified with `ls -la /data` |
-| 30 | Image tags are never reused, every change gets a new version (now 1.3) | |
+| 30 | Image tags are never reused, every change gets a new version (now 1.4) | |
+
+## After the first review
+
+| # | Decision | Notes |
+| --- | --- | --- |
+| 31 | Name field is a picker of existing Persons; Enter on an unknown name creates the Person | `POST /person`, a small script auto-selects on pick, works without it too |
+| 32 | Stamping an unknown name is rejected with `404` | No accidental Persons from typos |
+| 33 | Existing databases are migrated: everyone with stamps becomes a Person | Runs at startup, idempotent |
+| 34 | Only Docker, k3d, kubectl, make and curl on the host | Unit tests run in a Dockerfile `test` stage, Typst in its container |
+| 35 | The compiled PDF is committed | |

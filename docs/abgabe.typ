@@ -19,18 +19,18 @@
 
 = SOLL
 
-We want a small time-tracking service that runs on Kubernetes in a dev and a prod variant. A person types their name, stamps `EIN`, `PAUSE`, `ZURÜCK` or `AUS` and can add a note per stamp (the "Rapport", e.g. _Support XYZ Kunde Meyer_). The main page shows a status board with every person, their current status and the time they worked today, plus the last 20 stamps and which pod answered.
+We want a small time-tracking service that runs on Kubernetes in a dev and a prod variant. A person picks their name from a list (a new name plus Enter creates the person), stamps `EIN`, `PAUSE`, `ZURÜCK` or `AUS` and can add a note per stamp (the "Rapport", e.g. _Support XYZ Kunde Meyer_). The main page shows a status board with every person, their current status and the time they worked today, plus the last 20 stamps and which pod answered.
 
 #grid(columns: (1fr, 6.2cm), gutter: 12pt,
 [
 == functionality
 - Every person has their own state. Allowed transitions are out → `EIN` → working → `PAUSE` → on break → `ZURÜCK` → working → `AUS` → out. Anything else is rejected with `409`, and buttons that aren't allowed are disabled in the UI.
-- There is no login, a person is the name they type, compared case-insensitively. Real users and RBAC were optional in the brief and we left them out on purpose, so anyone can stamp for anyone.
+- There is no login. A person is just a name, created once and then picked from the list, compared case-insensitively. Stamping a name that doesn't exist is rejected with `404`, so a typo doesn't create a second person. Real users and RBAC were optional in the brief and we left them out on purpose, so anyone can stamp for anyone.
 - Stamps are stored append-only in SQLite under `/data` on a PVC. Deleting every pod doesn't lose anything, `make smoke` checks exactly that.
 - The form post redirects back to the page (`303`), a JSON post returns the stamp (`201`), so the same endpoint works for the browser and for `curl`.
 ],
 [
-  #figure(image("img/ui-prod.png", width: 100%), caption: [prod UI, 3 replicas])
+  #figure(image("img/ui.png", width: 100%), caption: [UI with a person selected])
 ])
 
 == platform
@@ -54,7 +54,7 @@ k8s/overlays/prod/   kustomization.yaml, namespace.yaml, ingress.yaml, resources
 Makefile, smoke.sh, README.md, docs/
 ```
 
-Setup is `make cluster dev prod`, the README has every step as plain commands too, including the minikube equivalents.
+Setup is `make cluster dev prod`, the README has every step as plain commands too, including the minikube equivalents. The host only needs Docker, k3d, kubectl, make and curl: the unit tests run in a `test` stage of the Dockerfile (a failing test stops the build), and this PDF is built with the Typst container.
 
 = Security requirements
 
@@ -70,9 +70,9 @@ Every requirement maps to the line that implements it. Where we decided against 
   [6], [CPU and memory requests and limits, dev smaller than prod], [`resources` in base, prod patch], [resource exhaustion, noisy neighbour],
   [7], [Base image pinned by digest, no build tools at runtime], [`python:3.13-slim@sha256:…`, multi-stage build, pip removed], [drifting base, CVE surface],
   [8], [No known HIGH/CRITICAL CVEs], [`make scan` (Trivy): 4 HIGH in pip found, pip removed, now 0], [known vulnerabilities],
-  [9], [Input validation], [action whitelist, name ≤ 60 chars, note ≤ 200 chars, otherwise `400`], [injection, unbounded writes],
+  [9], [Input validation], [action whitelist, name ≤ 60 chars, note ≤ 200 chars, otherwise `400`; unknown person `404`], [injection, unbounded writes],
   [10], [Output escaping], [Jinja autoescape, tested with `<script>` in name and note], [stored XSS via the note],
-  [11], [Strict browser policy], [`Content-Security-Policy: default-src 'none'; style-src 'self'; form-action 'self'; frame-ancestors 'none'`, `nosniff`], [XSS, clickjacking],
+  [11], [Strict browser policy], [`Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'`, no inline script, `nosniff`], [XSS, clickjacking],
   [12], [Consistent data with 3 writers], [status check and insert in one `BEGIN IMMEDIATE` transaction], [double stamps, corrupt records],
   [13], [Prod not exposed via NodePort], [prod `ClusterIP` + Ingress only], [unintended exposure],
   [14], [No secrets in image, repo or prompts], [none needed, `.dockerignore` is an allow list], [credential leaks],
