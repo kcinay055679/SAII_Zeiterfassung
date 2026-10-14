@@ -9,7 +9,7 @@ Everything settled while planning, in one place. The ones that are hard to rever
 | 1 | Built with Claude Code, no Hermes | [ADR-0005](adr/0005-claude-code-instead-of-hermes.md) |
 | 2 | Lives in `zeiterfassung/` next to `kubernetes-demo-minikube/`, which is the reference | Course path `~/workspace/zeiterfassung` not used |
 | 3 | Order of work: app and cluster first, docs afterwards | |
-| 4 | Group project (26A Gruppe 6) | Authors on the document |
+| 4 | Group project (26A Gruppe 6) | Authors: Yogani Y., Luca G., Yanick M. |
 | 5 | Git history with conventional commits, committed in small steps | HowTo asks for a traceable history |
 
 ## Functionality
