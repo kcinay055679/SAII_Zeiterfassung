@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zeiterfassung</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main>
+  <h1>Zeiterfassung</h1>
+
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/stamp">
+    <label>Name
+      <input name="name" value="{{ name }}" maxlength="{{ max_name }}" required autocomplete="name">
+    </label>
+    <label>Rapport / Notiz (optional)
+      <input name="note" maxlength="{{ max_note }}" placeholder="z.B. Support XYZ Kunde Meyer">
+    </label>
+    {% if me %}
+    <p class="me">{{ me.person }}: <strong class="status status-{{ me.status|lower|replace(' ', '-') }}">{{ me.status }}</strong>
+      &middot; heute {{ me.worked_seconds|duration }} h</p>
+    {% endif %}
+    <div class="actions">
+      {% for action in actions %}
+      <button name="action" value="{{ action }}"{% if me and action not in me.allowed %} disabled{% endif %}>{{ labels[action] }}</button>
+      {% endfor %}
+    </div>
+  </form>
+
+  <h2>Status</h2>
+  {% if board %}
+  <table>
+    <tr><th>Person</th><th>Status</th><th>Heute</th></tr>
+    {% for p in board %}
+    <tr><td>{{ p.person }}</td><td class="status status-{{ p.status|lower|replace(' ', '-') }}">{{ p.status }}</td><td>{{ p.worked_seconds|duration }} h</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">Noch niemand eingestempelt.</p>
+  {% endif %}
+
+  <h2>Letzte Stempelungen</h2>
+  {% if stamps %}
+  <table>
+    <tr><th>Zeit</th><th>Person</th><th>Aktion</th><th>Notiz</th><th>Pod</th></tr>
+    {% for s in stamps %}
+    <tr><td>{{ s.ts|local }}</td><td>{{ s.person }}</td><td>{{ labels[s.action] }}</td><td>{{ s.note }}</td><td><code>{{ s.pod }}</code></td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">Keine Stempelungen.</p>
+  {% endif %}
+
+  <footer>Version <strong>{{ version }}</strong> &middot; Pod <code>{{ pod }}</code></footer>
+</main>
+</body>
+</html>
