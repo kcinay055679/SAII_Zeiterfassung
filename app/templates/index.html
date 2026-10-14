@@ -20,7 +20,7 @@
       <input name="note" maxlength="{{ max_note }}" placeholder="z.B. Support XYZ Kunde Meyer">
     </label>
     {% if me %}
-    <p class="me">{{ me.person }}: <strong class="status status-{{ me.status|lower|replace(' ', '-') }}">{{ me.status }}</strong>
+    <p class="me">{{ me.person }}: <strong class="status status-{{ me.status|lower|replace(' ', '-') }}">{{ status_labels[me.status] }}</strong>
       &middot; heute {{ me.worked_seconds|duration }} h</p>
     {% endif %}
     <div class="actions">
@@ -35,7 +35,7 @@
   <table>
     <tr><th>Person</th><th>Status</th><th>Heute</th></tr>
     {% for p in board %}
-    <tr><td>{{ p.person }}</td><td class="status status-{{ p.status|lower|replace(' ', '-') }}">{{ p.status }}</td><td>{{ p.worked_seconds|duration }} h</td></tr>
+    <tr><td>{{ p.person }}</td><td class="status status-{{ p.status|lower|replace(' ', '-') }}">{{ status_labels[p.status] }}</td><td>{{ p.worked_seconds|duration }} h</td></tr>
     {% endfor %}
   </table>
   {% else %}
@@ -47,7 +47,7 @@
   <table>
     <tr><th>Zeit</th><th>Person</th><th>Aktion</th><th>Notiz</th><th>Pod</th></tr>
     {% for s in stamps %}
-    <tr><td>{{ s.ts|local }}</td><td>{{ s.person }}</td><td>{{ labels[s.action] }}</td><td>{{ s.note }}</td><td><code>{{ s.pod }}</code></td></tr>
+    <tr><td class="nowrap">{{ s.ts|local }}</td><td>{{ s.person }}</td><td>{{ labels[s.action] }}</td><td>{{ s.note }}</td><td><code>{{ s.pod }}</code></td></tr>
     {% endfor %}
   </table>
   {% else %}

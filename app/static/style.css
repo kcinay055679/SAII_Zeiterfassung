@@ -20,3 +20,4 @@ footer { margin-top: 36px; color: #555; }
   main { margin: 0; padding: 16px; border: 0; }
   .actions { grid-template-columns: repeat(2, 1fr); }
 }
+.nowrap { white-space: nowrap; }

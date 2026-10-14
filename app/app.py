@@ -5,10 +5,11 @@ from pathlib import Path
 
 from flask import Flask, jsonify, redirect, render_template, request
 
-from store import (ACTIONS, LABELS, LOCAL_TZ, MAX_NAME, MAX_NOTE,
-                   InvalidInput, InvalidTransition, Store)
+from store import (ACTIONS, LABELS, LOCAL_TZ, MAX_NAME, MAX_NOTE, ON_BREAK,
+                   OUT, WORKING, InvalidInput, InvalidTransition, Store)
 
 NAME_COOKIE = "zeiterfassung_name"
+STATUS_LABELS = {OUT: "AUSGESTEMPELT", WORKING: "EINGESTEMPELT", ON_BREAK: "IN PAUSE"}
 
 
 def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
@@ -41,6 +42,7 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
             me=me,
             actions=ACTIONS,
             labels=LABELS,
+            status_labels=STATUS_LABELS,
             board=store.board(),
             stamps=store.recent(),
             error=error,

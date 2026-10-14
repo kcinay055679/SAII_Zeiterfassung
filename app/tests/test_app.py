@@ -31,7 +31,7 @@ def test_form_stamp_redirects_and_remembers_name(client):
     assert response.headers["Location"] == "/"
     assert f"{NAME_COOKIE}=Anna" in response.headers["Set-Cookie"]
     page = client.get("/").get_data(as_text=True)
-    assert "WORKING" in page
+    assert "EINGESTEMPELT" in page
 
 
 def test_json_stamp_returns_created(client):
