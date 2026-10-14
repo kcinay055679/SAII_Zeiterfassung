@@ -12,6 +12,6 @@ replicas:
     count: 1
 images:
   - name: zeiterfassung
-    newTag: "1.1"
+    newTag: "1.2"
 patches:
   - path: service-nodeport.yaml
