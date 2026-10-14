@@ -50,3 +50,16 @@ Everything settled while planning, in one place. The ones that are hard to rever
 | 22 | AI Decision Log as a separate file, Claude Code as the AI, four-column format from the HowTo | |
 | 23 | Screenshots as commented-out placeholders until recorded | |
 | 24 | No video script | |
+
+## Found during the build
+
+Details and evidence in the [AI decision log](ai-decision-log.md).
+
+| # | Decision | Notes |
+| --- | --- | --- |
+| 25 | Health probe file gets a unique name per call | Readiness and liveness collided, `503` every 10s |
+| 26 | `preStop` sleep of 5s | Rollouts dropped 3 of 290 requests without it |
+| 27 | pip removed from the runtime image | Only source of HIGH CVEs |
+| 28 | Rootless Docker: kubelet feature gate and `k3d image import --mode direct` | Detected by the Makefile |
+| 29 | No root initContainer, `fsGroup` is enough on `local-path` | Verified with `ls -la /data` |
+| 30 | Image tags are never reused, every change gets a new version (now 1.3) | |
