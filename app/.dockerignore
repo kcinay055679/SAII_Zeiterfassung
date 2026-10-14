@@ -2,5 +2,9 @@
 !app.py
 !store.py
 !requirements.txt
+!requirements-dev.txt
+!pytest.ini
 !templates/
 !static/
+!tests/
+**/__pycache__

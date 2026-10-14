@@ -7,8 +7,19 @@ COPY requirements.txt .
 RUN /venv/bin/pip install --no-cache-dir -r requirements.txt \
  && /venv/bin/pip uninstall -y pip
 
+# `docker build --target test` runs the unit tests; the build fails if they do.
+# Non-root, otherwise the "data dir not writable" test can't fail as it should.
+FROM ${BASE} AS test
+RUN useradd --system --uid 10001 --user-group --create-home appuser
+WORKDIR /app
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+COPY --chown=appuser:appuser . .
+USER 10001
+RUN python -m pytest -q -p no:cacheprovider
+
 FROM ${BASE}
-ARG APP_VERSION=1.3
+ARG APP_VERSION=1.4
 ENV APP_VERSION=${APP_VERSION} \
     DATA_DIR=/data \
     PATH=/venv/bin:$PATH \

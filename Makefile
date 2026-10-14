@@ -1,32 +1,31 @@
+SHELL := /bin/bash
 CLUSTER      ?= saii
 REGISTRY     ?= registry.localhost
 REGISTRY_PORT ?= 5050
-VERSION      ?= 1.3
+VERSION      ?= 1.4
 IMAGE        := zeiterfassung:$(VERSION)
 PROD_IMAGE   := localhost:$(REGISTRY_PORT)/zeiterfassung:$(VERSION)
 DEV_URL      ?= http://localhost:8080
 PROD_URL     ?= http://zeiterfassung.localhost:8081
-VENV         := .venv
+TYPST_IMAGE  ?= ghcr.io/typst/typst:0.15.1@sha256:032e292249bcd378480cc7c142cfa324b63ef8aadeb88d7e7230320c4c9c422f
 
 # Rootless Docker runs k3s in a user namespace where the kubelet can't open
 # /dev/kmsg; this feature gate makes it tolerate that.
 ROOTLESS := $(shell docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless && echo yes)
 DOCKER_SOCK := $(patsubst unix://%,%,$(shell docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null))
+# Rootful Docker writes files as root unless we pass our uid; rootless maps
+# container root to us already, and passing a uid would map it to a subuid.
+DOCKER_USER := $(if $(ROOTLESS),,--user $(shell id -u):$(shell id -g))
 K3S_ARGS := $(if $(ROOTLESS),--k3s-arg "--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*")
 
-.PHONY: help venv test cluster build dev prod status smoke scan docs clean
+.PHONY: help test cluster build dev prod status smoke scan docs clean
 
 help:
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
-$(VENV):
-	python3 -m venv $(VENV)
-	$(VENV)/bin/pip install -q -r app/requirements.txt -r app/requirements-dev.txt
-
-venv: $(VENV) ## Create the local Python environment
-
-test: $(VENV) ## Run the unit tests
-	cd app && ../$(VENV)/bin/python -m pytest -q
+test: ## Run the unit tests in a container
+	docker build --target test --no-cache-filter test --progress=plain app 2>&1 | grep -E 'passed|failed|FAILED|Error' ; \
+		exit $${PIPESTATUS[0]}
 
 cluster: ## Create the k3d registry and single-node cluster
 	k3d registry list | grep -q k3d-$(REGISTRY) || \
@@ -40,7 +39,7 @@ cluster: ## Create the k3d registry and single-node cluster
 	kubectl config use-context k3d-$(CLUSTER)
 	kubectl wait --for=condition=Ready node --all --timeout=120s
 
-build: ## Build the image
+build: test ## Run the tests, then build the image
 	docker build -t $(IMAGE) --build-arg APP_VERSION=$(VERSION) app
 
 dev: build ## Import the image and deploy the dev overlay
@@ -67,7 +66,8 @@ scan: ## Scan the image for known CVEs with Trivy (runs as a container)
 		image --severity HIGH,CRITICAL --ignore-unfixed $(IMAGE)
 
 docs: ## Build docs/abgabe.pdf from docs/abgabe.typ
-	typst compile docs/abgabe.typ docs/abgabe.pdf
+	docker run --rm $(DOCKER_USER) -v $(CURDIR)/docs:/docs -w /docs $(TYPST_IMAGE) \
+		compile abgabe.typ abgabe.pdf
 
 clean: ## Delete the cluster and the registry, including all data
 	k3d cluster delete $(CLUSTER)
