@@ -22,7 +22,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: zeiterfassung:1.3
+          image: zeiterfassung:1.4
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
