@@ -14,7 +14,7 @@ ROOTLESS := $(shell docker info --format '{{.SecurityOptions}}' 2>/dev/null | gr
 DOCKER_SOCK := $(patsubst unix://%,%,$(shell docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null))
 K3S_ARGS := $(if $(ROOTLESS),--k3s-arg "--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*")
 
-.PHONY: help venv test cluster build dev prod status smoke scan clean
+.PHONY: help venv test cluster build dev prod status smoke scan docs clean
 
 help:
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -65,6 +65,9 @@ scan: ## Scan the image for known CVEs with Trivy (runs as a container)
 	docker run --rm -v $(DOCKER_SOCK):/var/run/docker.sock \
 		-v trivy-cache:/root/.cache aquasec/trivy:0.69.3 \
 		image --severity HIGH,CRITICAL --ignore-unfixed $(IMAGE)
+
+docs: ## Build docs/abgabe.pdf from docs/abgabe.typ
+	typst compile docs/abgabe.typ docs/abgabe.pdf
 
 clean: ## Delete the cluster and the registry, including all data
 	k3d cluster delete $(CLUSTER)
