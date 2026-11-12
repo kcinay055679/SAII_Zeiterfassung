@@ -44,13 +44,13 @@ build: test ## Run the tests, then build the image
 
 dev: build ## Import the image and deploy the dev overlay
 	k3d image import $(IMAGE) -c $(CLUSTER) --mode direct
-	kubectl apply -k k8s/overlays/dev
+	kubectl apply -k deploy/zeiterfassung/overlays/dev
 	kubectl -n zeiterfassung-dev rollout status deployment/zeiterfassung --timeout=120s
 
 prod: build ## Push the image to the registry and deploy the prod overlay
 	docker tag $(IMAGE) $(PROD_IMAGE)
 	docker push $(PROD_IMAGE)
-	kubectl apply -k k8s/overlays/prod
+	kubectl apply -k deploy/zeiterfassung/overlays/prod
 	kubectl -n zeiterfassung-prod rollout status deployment/zeiterfassung --timeout=180s
 
 status: ## Show pods, services, PVCs and ingress of both environments

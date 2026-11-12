@@ -51,7 +51,7 @@ kubectl get nodes
 kubectl get storageclass   # local-path (default)
 ```
 
-`--agents 0` is on purpose. The data volume is `ReadWriteOnce` on `local-path`, which is node local, so all three prod replicas have to run on the same node to share it (see [ADR-0001](../spec/adr/0001-k3d-single-node-cluster.md)). Port `8080` goes to the dev NodePort `30080`, port `8081` goes to Traefik, which serves the prod ingress.
+`--agents 0` is on purpose. The data volume is `ReadWriteOnce` on `local-path`, which is node local, so all three prod replicas have to run on the same node to share it (see [ADR-0001](https://github.com/kcinay055679/HF_SAII_f-ju-gothe/blob/main/spec/adr/0001-k3d-single-node-cluster.md)). Port `8080` goes to the dev NodePort `30080`, port `8081` goes to Traefik, which serves the prod ingress.
 
 #### 2. dev
 
@@ -61,8 +61,8 @@ Dev uses a local image that is imported straight into the cluster, no registry i
 docker build --target test app            # unit tests, the build fails if one fails
 docker build -t zeiterfassung:1.4 --build-arg APP_VERSION=1.4 app
 k3d image import zeiterfassung:1.4 -c saii --mode direct
-kubectl kustomize k8s/overlays/dev        # look at it before applying
-kubectl apply -k k8s/overlays/dev
+kubectl kustomize deploy/zeiterfassung/overlays/dev        # look at it before applying
+kubectl apply -k deploy/zeiterfassung/overlays/dev
 kubectl -n zeiterfassung-dev rollout status deployment/zeiterfassung
 kubectl -n zeiterfassung-dev get pods,svc,pvc
 ```
@@ -74,7 +74,7 @@ Prod pulls from the k3d registry, like a real cluster would pull from a registry
 ```bash
 docker tag zeiterfassung:1.4 localhost:5050/zeiterfassung:1.4
 docker push localhost:5050/zeiterfassung:1.4
-kubectl apply -k k8s/overlays/prod
+kubectl apply -k deploy/zeiterfassung/overlays/prod
 kubectl -n zeiterfassung-prod rollout status deployment/zeiterfassung
 kubectl -n zeiterfassung-prod get pods,svc,pvc,ingress -o wide
 ```
@@ -157,17 +157,18 @@ On rootless Docker, two things break with the k3d defaults. The Makefile detects
 ## layout
 
 ```text
-app/                 Flask app, Dockerfile, tests
-k8s/base/            deployment, service, pvc
-k8s/overlays/dev/    1 replica, NodePort, imported image
-k8s/overlays/prod/   3 replicas, ClusterIP, ingress, registry image
-smoke.sh             end to end check against the cluster
-../spec/GLOSSARY.md  domain glossary (project level)
-../spec/adr/         architecture decisions (project level)
-docs/decisions.md    every decision from planning
+app/                                Flask app, Dockerfile, tests
+deploy/                             everything that runs in the cluster, see deploy/README.md
+deploy/zeiterfassung/base/          deployment, service, pvc
+deploy/zeiterfassung/overlays/dev/  1 replica, NodePort, imported image
+deploy/zeiterfassung/overlays/prod/ 3 replicas, ClusterIP, ingress, registry image
+smoke.sh                            end to end check against the cluster
+docs/decisions.md                   every decision from planning
 docs/ai-decision-log.md
-docs/abgabe.typ      submission document, `make docs` builds docs/abgabe.pdf in a container
+docs/abgabe.typ                     Tag 5 submission, `make docs` builds docs/abgabe.pdf in a container
 ```
+
+The glossary and the ADRs live in the project repo [HF_SAII_f-ju-gothe](https://github.com/kcinay055679/HF_SAII_f-ju-gothe/tree/main/spec), which has this repo as a submodule.
 
 ## cleanup
 
