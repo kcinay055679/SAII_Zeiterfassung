@@ -1,12 +1,12 @@
 # Decisions
 
-Everything settled while planning, in one place. The ones that are hard to reverse have an ADR in [adr/](adr/). Terms are defined in [CONTEXT.md](../CONTEXT.md).
+Everything settled while planning, in one place. The ones that are hard to reverse have an ADR in [adr/](../../spec/adr/). Terms are defined in [GLOSSARY.md](../../spec/GLOSSARY.md).
 
 ## Scope and process
 
 | # | Decision | Notes |
 | --- | --- | --- |
-| 1 | Built with Claude Code, no Hermes | [ADR-0005](adr/0005-claude-code-instead-of-hermes.md) |
+| 1 | Built with Claude Code, no Hermes | [ADR-0005](../../spec/adr/0005-claude-code-instead-of-hermes.md) |
 | 2 | Lives in `zeiterfassung/` next to `kubernetes-demo-minikube/`, which is the reference | Course path `~/workspace/zeiterfassung` not used |
 | 3 | Order of work: app and cluster first, docs afterwards | |
 | 4 | Group project (26A Gruppe 6) | Authors: Yogani Y., Luca G., Yanick M. |
@@ -16,20 +16,20 @@ Everything settled while planning, in one place. The ones that are hard to rever
 
 | # | Decision | Notes |
 | --- | --- | --- |
-| 6 | Every Stamp carries a Person name, no auth | [ADR-0004](adr/0004-name-per-stamp-without-auth.md) |
+| 6 | Every Stamp carries a Person name, no auth | [ADR-0004](../../spec/adr/0004-name-per-stamp-without-auth.md) |
 | 7 | Valid transitions enforced per Person; invalid gets HTTP 409, invalid buttons disabled | |
 | 8 | Optional Note per Stamp, max 200 characters | Course: "Rapport/Notiz" |
 | 9 | Main page: person picker + note + four buttons, Status board, recent Stamps | Selected person remembered in a cookie; "today" is Europe/Zurich |
 | 10 | Form POST answers 303 → `/`, JSON POST answers JSON | Same pattern as the instructor's reference app |
-| 11 | Storage is SQLite under `/data` | [ADR-0002](adr/0002-sqlite-on-shared-rwo-volume.md) |
+| 11 | Storage is SQLite under `/data` | [ADR-0002](../../spec/adr/0002-sqlite-on-shared-rwo-volume.md) |
 
 ## Platform
 
 | # | Decision | Notes |
 | --- | --- | --- |
-| 12 | k3d single-node cluster | [ADR-0001](adr/0001-k3d-single-node-cluster.md) |
-| 13 | Dev: 1 replica, NodePort, imported image, `localhost:8080` | [ADR-0003](adr/0003-dev-local-image-prod-local-registry.md) |
-| 14 | Prod: 3 replicas, ClusterIP + Traefik Ingress, local registry, `zeiterfassung.localhost:8081`; actually runs | [ADR-0003](adr/0003-dev-local-image-prod-local-registry.md) |
+| 12 | k3d single-node cluster | [ADR-0001](../../spec/adr/0001-k3d-single-node-cluster.md) |
+| 13 | Dev: 1 replica, NodePort, imported image, `localhost:8080` | [ADR-0003](../../spec/adr/0003-dev-local-image-prod-local-registry.md) |
+| 14 | Prod: 3 replicas, ClusterIP + Traefik Ingress, local registry, `zeiterfassung.localhost:8081`; actually runs | [ADR-0003](../../spec/adr/0003-dev-local-image-prod-local-registry.md) |
 | 15 | Setup via README (raw commands) plus Makefile shortcuts | |
 | 16 | Base image pinned by digest; optional `make scan` with Trivy | |
 

@@ -1,6 +1,6 @@
 # AI decision log
 
-The service was built with Claude Code (Claude Opus 5.5) instead of Hermes, see [ADR-0005](adr/0005-claude-code-instead-of-hermes.md). The format is the one from the Hermes HowTo: what was decided, what the AI proposed, how we checked it and what came out. We only list entries where we actually ran a check. A proposal we just agreed with doesn't count as reviewed.
+The service was built with Claude Code (Claude Opus 5.5) instead of Hermes, see [ADR-0005](../../spec/adr/0005-claude-code-instead-of-hermes.md). The format is the one from the Hermes HowTo: what was decided, what the AI proposed, how we checked it and what came out. We only list entries where we actually ran a check. A proposal we just agreed with doesn't count as reviewed.
 
 ## overview
 
@@ -24,7 +24,7 @@ We found it because `kubectl get events --field-selector reason=Unhealthy` was f
 Fix: `tempfile.NamedTemporaryFile(dir=data_dir)` gives every call its own name. A test with 200 parallel health calls failed before the fix and passes after it. On the redeployed pods there were no `Unhealthy` events and no restarts. This is the entry we'd point to first, the AI wrote a health check whose whole point is to catch real problems, and it produced a false one.
 
 #### storage: three replicas on one ReadWriteOnce volume
-The deck asks for 3 replicas in prod and persistence on a PVC. `ReadWriteOnce` with `local-path` only works because the cluster has a single node, so all pods mount the same host directory ([ADR-0001](adr/0001-k3d-single-node-cluster.md)). The original plan was a JSONL file with `flock`. We switched to SQLite, because the transition check ("is this person allowed to stamp `PAUSE` right now") needs read and write atomically, across processes in different pods ([ADR-0002](adr/0002-sqlite-on-shared-rwo-volume.md)).
+The deck asks for 3 replicas in prod and persistence on a PVC. `ReadWriteOnce` with `local-path` only works because the cluster has a single node, so all pods mount the same host directory ([ADR-0001](../../spec/adr/0001-k3d-single-node-cluster.md)). The original plan was a JSONL file with `flock`. We switched to SQLite, because the transition check ("is this person allowed to stamp `PAUSE` right now") needs read and write atomically, across processes in different pods ([ADR-0002](../../spec/adr/0002-sqlite-on-shared-rwo-volume.md)).
 
 Check: 20 parallel `POST /stamp` with `EIN` for the same new person against prod. Result: exactly one `201`, nineteen `409`, and the gunicorn logs show the requests spread over all three pods. Also part of the unit tests with 8 threads on one database file.
 

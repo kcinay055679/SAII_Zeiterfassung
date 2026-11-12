@@ -51,7 +51,7 @@ kubectl get nodes
 kubectl get storageclass   # local-path (default)
 ```
 
-`--agents 0` is on purpose. The data volume is `ReadWriteOnce` on `local-path`, which is node local, so all three prod replicas have to run on the same node to share it (see [ADR-0001](docs/adr/0001-k3d-single-node-cluster.md)). Port `8080` goes to the dev NodePort `30080`, port `8081` goes to Traefik, which serves the prod ingress.
+`--agents 0` is on purpose. The data volume is `ReadWriteOnce` on `local-path`, which is node local, so all three prod replicas have to run on the same node to share it (see [ADR-0001](../spec/adr/0001-k3d-single-node-cluster.md)). Port `8080` goes to the dev NodePort `30080`, port `8081` goes to Traefik, which serves the prod ingress.
 
 #### 2. dev
 
@@ -162,8 +162,8 @@ k8s/base/            deployment, service, pvc
 k8s/overlays/dev/    1 replica, NodePort, imported image
 k8s/overlays/prod/   3 replicas, ClusterIP, ingress, registry image
 smoke.sh             end to end check against the cluster
-CONTEXT.md           domain glossary
-docs/adr/            architecture decisions
+../spec/GLOSSARY.md  domain glossary (project level)
+../spec/adr/         architecture decisions (project level)
 docs/decisions.md    every decision from planning
 docs/ai-decision-log.md
 docs/abgabe.typ      submission document, `make docs` builds docs/abgabe.pdf in a container
