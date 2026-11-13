@@ -744,7 +744,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100 * sum(rate(http_requests_total{job=\"zeiterfassung\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"zeiterfassung\"}[5m]))",
+          "expr": "100 * (sum(rate(http_requests_total{job=\"zeiterfassung\",status=~\"5..\"}[5m])) or vector(0)) / sum(rate(http_requests_total{job=\"zeiterfassung\"}[5m]))",
           "legendFormat": "5xx",
           "range": true,
           "refId": "A"
