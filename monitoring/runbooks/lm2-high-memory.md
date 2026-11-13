@@ -2,7 +2,7 @@
 
 Die RAM-Auslastung auf LM2 liegt seit mindestens fünf Minuten über 85 %.
 
-1. Im Grafana-Dashboard «LM2 Kundenmonitoring» prüfen, seit wann der RAM-Verlauf steigt.
+1. Im Grafana-Dashboard «LM2 und Zeiterfassung» prüfen, seit wann der RAM-Verlauf steigt.
 2. Auf LM2 mit `free -h` den freien Speicher prüfen.
 3. Mit `top` (Taste `M`) den Prozess mit dem grössten Speicherbedarf suchen.
 4. Container mit `docker stats --no-stream` kontrollieren.
