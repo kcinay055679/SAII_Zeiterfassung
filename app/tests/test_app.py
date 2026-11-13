@@ -140,3 +140,12 @@ def test_no_person_selected_disables_all_buttons(tmp_path):
     page = create_app(tmp_path).test_client().get("/").get_data(as_text=True)
     for action in ("EIN", "PAUSE", "ZURUECK", "AUS"):
         assert f'value="{action}" disabled' in page
+
+
+def test_metrics_count_requests_by_route_template(client):
+    client.get("/health")
+    client.get("/does-not-exist")
+    body = client.get("/metrics").get_data(as_text=True)
+    assert 'http_requests_total{endpoint="/health",method="GET",status="200"}' in body
+    assert 'endpoint="unmatched",method="GET",status="404"' in body
+    assert "http_request_duration_seconds_bucket" in body

@@ -19,7 +19,7 @@ USER 10001
 RUN python -m pytest -q -p no:cacheprovider
 
 FROM ${BASE}
-ARG APP_VERSION=1.4
+ARG APP_VERSION=1.5
 ENV APP_VERSION=${APP_VERSION} \
     DATA_DIR=/data \
     PATH=/venv/bin:$PATH \

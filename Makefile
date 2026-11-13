@@ -2,7 +2,7 @@ SHELL := /bin/bash
 CLUSTER      ?= saii
 REGISTRY     ?= registry.localhost
 REGISTRY_PORT ?= 5050
-VERSION      ?= 1.4
+VERSION      ?= 1.5
 IMAGE        := zeiterfassung:$(VERSION)
 PROD_IMAGE   := localhost:$(REGISTRY_PORT)/zeiterfassung:$(VERSION)
 DEV_URL      ?= http://localhost:8080
@@ -18,7 +18,7 @@ DOCKER_SOCK := $(patsubst unix://%,%,$(shell docker context inspect --format '{{
 DOCKER_USER := $(if $(ROOTLESS),,--user $(shell id -u):$(shell id -g))
 K3S_ARGS := $(if $(ROOTLESS),--k3s-arg "--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*")
 
-.PHONY: help test cluster build dev prod status smoke scan docs clean
+.PHONY: help test cluster build dev prod up down status smoke scan docs clean
 
 help:
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -52,6 +52,12 @@ prod: build ## Push the image to the registry and deploy the prod overlay
 	docker push $(PROD_IMAGE)
 	kubectl apply -k deploy/zeiterfassung/overlays/prod
 	kubectl -n zeiterfassung-prod rollout status deployment/zeiterfassung --timeout=180s
+
+up: test ## Run the app with Prometheus, node exporter and Grafana via docker compose
+	docker compose up -d --build
+
+down: ## Stop the docker compose stack, keeps the volumes
+	docker compose down
 
 status: ## Show pods, services, PVCs and ingress of both environments
 	kubectl get pods,svc,pvc,ingress -n zeiterfassung-dev -o wide

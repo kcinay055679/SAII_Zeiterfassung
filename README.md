@@ -35,6 +35,40 @@ Then open:
 
 `make help` lists all targets. Every target is a thin wrapper, the steps below are the same thing without `make`.
 
+## docker compose (LM2)
+
+`docker-compose.yml` runs the app together with its monitoring, no Kubernetes needed. This is how LM2 runs today, until Argo CD takes over.
+
+```bash
+git clone https://github.com/kcinay055679/SAII_Zeiterfassung.git
+cd SAII_Zeiterfassung
+make up      # unit tests, then docker compose up -d --build
+make down    # stop, keeps the data volumes
+```
+
+| Service | Port | What |
+| --- | --- | --- |
+| `zeiterfassung` | 8080 | the app, data in the volume `zeiterfassung-data` |
+| `prometheus` | 9090 | scrapes itself, the node exporter and the app's `/metrics` every 15 s, evaluates `monitoring/prometheus/alerts.yml` |
+| `node-exporter` | 9100 | host metrics (CPU, RAM, disk) of the machine it runs on |
+| `grafana` | 3000 | user `admin`, password `saii-demo` (course setup only). Dashboard "LM2 und Zeiterfassung" is provisioned |
+
+Without make: `docker compose up -d --build`. The app port can be moved with `APP_PORT=8090 docker compose up -d`, e.g. when `make dev` already uses 8080 on the same host.
+
+Alerts and what to do about them:
+
+| Alert | Fires when | Runbook |
+| --- | --- | --- |
+| `LM2NodeDown` | node exporter unreachable for 1 min | [lm2-node-down](monitoring/runbooks/lm2-node-down.md) |
+| `LM2HighMemoryUsage` | RAM > 85 % for 5 min | [lm2-high-memory](monitoring/runbooks/lm2-high-memory.md) |
+| `LM2HighCpuUsage` | CPU > 85 % for 5 min | [lm2-high-cpu](monitoring/runbooks/lm2-high-cpu.md) |
+| `LM2RootFilesystemLow` | `/` < 15 % free for 10 min | [lm2-root-filesystem-low](monitoring/runbooks/lm2-root-filesystem-low.md) |
+| `ZeiterfassungDown` | app `/metrics` unreachable for 1 min | [zeiterfassung-down](monitoring/runbooks/zeiterfassung-down.md) |
+| `ZeiterfassungHighErrorRate` | > 5 % 5xx for 5 min | [zeiterfassung-errors](monitoring/runbooks/zeiterfassung-errors.md) |
+| `ZeiterfassungSlowStamps` | p95 of `POST /stamp` > 500 ms for 10 min | [zeiterfassung-slow-stamps](monitoring/runbooks/zeiterfassung-slow-stamps.md) |
+
+There is no Alertmanager yet, so alerts are only visible at `:9090/alerts`. Mattermost comes later.
+
 ## step by step
 
 #### 1. registry and cluster
@@ -59,8 +93,8 @@ Dev uses a local image that is imported straight into the cluster, no registry i
 
 ```bash
 docker build --target test app            # unit tests, the build fails if one fails
-docker build -t zeiterfassung:1.4 --build-arg APP_VERSION=1.4 app
-k3d image import zeiterfassung:1.4 -c saii --mode direct
+docker build -t zeiterfassung:1.5 --build-arg APP_VERSION=1.5 app
+k3d image import zeiterfassung:1.5 -c saii --mode direct
 kubectl kustomize deploy/zeiterfassung/overlays/dev        # look at it before applying
 kubectl apply -k deploy/zeiterfassung/overlays/dev
 kubectl -n zeiterfassung-dev rollout status deployment/zeiterfassung
@@ -72,8 +106,8 @@ kubectl -n zeiterfassung-dev get pods,svc,pvc
 Prod pulls from the k3d registry, like a real cluster would pull from a registry.
 
 ```bash
-docker tag zeiterfassung:1.4 localhost:5050/zeiterfassung:1.4
-docker push localhost:5050/zeiterfassung:1.4
+docker tag zeiterfassung:1.5 localhost:5050/zeiterfassung:1.5
+docker push localhost:5050/zeiterfassung:1.5
 kubectl apply -k deploy/zeiterfassung/overlays/prod
 kubectl -n zeiterfassung-prod rollout status deployment/zeiterfassung
 kubectl -n zeiterfassung-prod get pods,svc,pvc,ingress -o wide
@@ -107,7 +141,7 @@ curl -s localhost:8080/events   # the stamp is still there
 | namespace | `zeiterfassung-dev` | `zeiterfassung-prod` |
 | replicas | 1 | 3 |
 | service | `NodePort` 30080 | `ClusterIP` + Traefik `Ingress` |
-| image | `zeiterfassung:1.4`, imported | `k3d-registry.localhost:5050/zeiterfassung:1.4`, pulled |
+| image | `zeiterfassung:1.5`, imported | `k3d-registry.localhost:5050/zeiterfassung:1.5`, pulled |
 | resources | 50m / 64Mi requested, 250m / 128Mi limit | 100m / 128Mi requested, 500m / 256Mi limit |
 | url | `localhost:8080` | `zeiterfassung.localhost:8081` |
 
@@ -121,6 +155,7 @@ curl -s localhost:8080/events   # the stamp is still there
 | `POST` | `/stamp` | form post => `303` to `/`, JSON post => `201` with the stamp. `400` on invalid input, `404` for an unknown person, `409` on a transition that isn't allowed |
 | `GET` | `/board` | status and worked seconds today per person |
 | `GET` | `/events` | last 20 stamps |
+| `GET` | `/metrics` | Prometheus metrics: `http_requests_total` and `http_request_duration_seconds` by method, route template and status |
 | `GET` | `/health` | writes a probe file to `/data` and queries the database, `503` if either fails |
 
 Allowed transitions per person: out -> `EIN` -> working -> `PAUSE` -> on break -> `ZURUECK` -> working -> `AUS` -> out.
@@ -140,7 +175,7 @@ The course uses minikube everywhere, this is the mapping.
 | minikube | here |
 | --- | --- |
 | `minikube start` | `k3d cluster create saii ...` |
-| `minikube image load zeiterfassung:1.4` | `k3d image import zeiterfassung:1.4 -c saii --mode direct` |
+| `minikube image load zeiterfassung:1.5` | `k3d image import zeiterfassung:1.5 -c saii --mode direct` |
 | `minikube kubectl -- get pods` | `kubectl get pods` |
 | `minikube service zeiterfassung` | fixed port mapping, `localhost:8080` |
 | `minikube addons enable ingress` | Traefik ships with k3s |
@@ -163,6 +198,10 @@ deploy/zeiterfassung/base/          deployment, service, pvc
 deploy/zeiterfassung/overlays/dev/  1 replica, NodePort, imported image
 deploy/zeiterfassung/overlays/prod/ 3 replicas, ClusterIP, ingress, registry image
 smoke.sh                            end to end check against the cluster
+docker-compose.yml                  app + Prometheus + node exporter + Grafana, for LM2
+monitoring/prometheus/              scrape config and alert rules
+monitoring/grafana/                 provisioned datasource and dashboard
+monitoring/runbooks/                one runbook per alert (German)
 docs/decisions.md                   every decision from planning
 docs/ai-decision-log.md
 docs/abgabe.typ                     Tag 5 submission, `make docs` builds docs/abgabe.pdf in a container

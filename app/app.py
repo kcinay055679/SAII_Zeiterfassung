@@ -1,9 +1,11 @@
 import os
 import socket
 import tempfile
+import time
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, g, jsonify, redirect, render_template, request
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from store import (ACTIONS, LABELS, LOCAL_TZ, MAX_NAME, MAX_NOTE, ON_BREAK,
                    OUT, WORKING, InvalidInput, InvalidTransition, Store,
@@ -11,6 +13,14 @@ from store import (ACTIONS, LABELS, LOCAL_TZ, MAX_NAME, MAX_NOTE, ON_BREAK,
 
 NAME_COOKIE = "zeiterfassung_name"
 STATUS_LABELS = {OUT: "AUSGESTEMPELT", WORKING: "EINGESTEMPELT", ON_BREAK: "IN PAUSE"}
+
+# Module level: prometheus_client refuses to register the same name twice, and
+# the tests call create_app() once per test.
+REQUESTS = Counter("http_requests_total", "HTTP requests",
+                   ["method", "endpoint", "status"])
+LATENCY = Histogram("http_request_duration_seconds", "HTTP request duration",
+                    ["method", "endpoint"],
+                    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5))
 
 
 def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
@@ -20,6 +30,24 @@ def create_app(data_dir: str | os.PathLike | None = None) -> Flask:
     store.init()
     pod = socket.gethostname()
     version = os.getenv("APP_VERSION", "dev")
+
+    @app.before_request
+    def start_timer():
+        g.started = time.perf_counter()
+
+    @app.after_request
+    def observe(response):
+        if request.path != "/metrics":
+            # The route template, not the path, so /person/<name> stays one series.
+            endpoint = request.url_rule.rule if request.url_rule else "unmatched"
+            REQUESTS.labels(request.method, endpoint, str(response.status_code)).inc()
+            LATENCY.labels(request.method, endpoint).observe(
+                time.perf_counter() - g.started)
+        return response
+
+    @app.get("/metrics")
+    def metrics():
+        return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
     @app.after_request
     def security_headers(response):

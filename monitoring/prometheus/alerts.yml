@@ -1,0 +1,81 @@
+groups:
+  - name: lm2.rules
+    rules:
+      - alert: LM2NodeDown
+        expr: up{job="lm2-node"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "LM2 liefert keine Host-Metriken"
+          description: "Prometheus kann den Node Exporter auf LM2 seit mindestens einer Minute nicht erreichen."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/lm2-node-down.md"
+
+      - alert: LM2HighMemoryUsage
+        expr: 100 * (1 - node_memory_MemAvailable_bytes{job="lm2-node"} / node_memory_MemTotal_bytes{job="lm2-node"}) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RAM-Auslastung auf LM2 ist hoch"
+          description: "Die RAM-Auslastung liegt seit mindestens fünf Minuten über 85 Prozent."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/lm2-high-memory.md"
+
+      - alert: LM2HighCpuUsage
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{job="lm2-node",mode="idle"}[5m]))) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "CPU-Auslastung auf LM2 ist hoch"
+          description: "Die CPU-Auslastung liegt seit mindestens fünf Minuten über 85 Prozent."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/lm2-high-cpu.md"
+
+      - alert: LM2RootFilesystemLow
+        expr: 100 * node_filesystem_avail_bytes{job="lm2-node",mountpoint="/"} / node_filesystem_size_bytes{job="lm2-node",mountpoint="/"} < 15
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Root-Dateisystem auf LM2 wird knapp"
+          description: "Auf / sind seit mindestens zehn Minuten weniger als 15 Prozent frei."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/lm2-root-filesystem-low.md"
+
+  - name: zeiterfassung.rules
+    rules:
+      - alert: ZeiterfassungDown
+        expr: up{job="zeiterfassung"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Zeiterfassung ist nicht erreichbar"
+          description: "Prometheus erreicht /metrics der Zeiterfassung seit mindestens einer Minute nicht. Mitarbeitende können nicht stempeln."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/zeiterfassung-down.md"
+
+      - alert: ZeiterfassungHighErrorRate
+        expr: sum(rate(http_requests_total{job="zeiterfassung",status=~"5.."}[5m])) / sum(rate(http_requests_total{job="zeiterfassung"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Zeiterfassung liefert viele Serverfehler"
+          description: "Mehr als 5 Prozent der Anfragen enden seit mindestens fünf Minuten mit einem 5xx-Status."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/zeiterfassung-errors.md"
+
+      - alert: ZeiterfassungSlowStamps
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="zeiterfassung",endpoint="/stamp"}[5m]))) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Stempeln ist langsam"
+          description: "Das p95 der Stempelanfragen liegt seit mindestens zehn Minuten über 500 ms (SLO: 95 Prozent innerhalb von 500 ms)."
+          runbook_url: "https://github.com/kcinay055679/SAII_Zeiterfassung/blob/main/monitoring/runbooks/zeiterfassung-slow-stamps.md"
